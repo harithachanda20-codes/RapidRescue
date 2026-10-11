@@ -1,0 +1,3 @@
+package com.rapidrescue.controller;
+import com.rapidrescue.dto.LocationRequest; import com.rapidrescue.service.LocationService; import jakarta.validation.Valid; import org.springframework.web.bind.annotation.*;
+@RestController @RequestMapping("/api/location") public class LocationController {private final LocationService s;public LocationController(LocationService s){this.s=s;}@PostMapping("/{ambulanceId}") public java.util.Map<String,String> update(@PathVariable Long ambulanceId,@Valid @RequestBody LocationRequest r){s.updateLocation(ambulanceId,r.latitude(),r.longitude());return java.util.Map.of("status","updated");}@GetMapping("/{ambulanceId}") public Object history(@PathVariable Long ambulanceId){return s.history(ambulanceId);}}

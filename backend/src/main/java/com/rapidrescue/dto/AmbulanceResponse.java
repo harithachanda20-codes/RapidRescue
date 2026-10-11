@@ -1,0 +1,1 @@
+package com.rapidrescue.dto; public record AmbulanceResponse(Long id,String ambulanceNumber,String type,String status,boolean emergencyAvailable,Double latitude,Double longitude,Long driverId,String driverName,String driverPhone) {}

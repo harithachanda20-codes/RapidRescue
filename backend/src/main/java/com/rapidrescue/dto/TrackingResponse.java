@@ -1,0 +1,1 @@
+package com.rapidrescue.dto; import java.time.LocalDateTime; public record TrackingResponse(Long id,String status,String priority,String type,Double pickupLatitude,Double pickupLongitude,AmbulanceResponse ambulance,HospitalResponse hospital,boolean hospitalAck,LocalDateTime createdAt,LocalDateTime updatedAt,String trackingToken) {}

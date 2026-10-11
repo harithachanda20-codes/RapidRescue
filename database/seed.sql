@@ -1,0 +1,4 @@
+-- Demo credentials:
+-- Admin: admin@rapidrescue.com / Admin@123
+-- Hospitals are inserted automatically by DatabaseConfig.
+-- Register patient/driver accounts from the UI or API.

@@ -1,0 +1,2 @@
+package com.rapidrescue.util;
+public final class DistanceCalculator { private DistanceCalculator(){} public static double km(double a,double b,double c,double d){double R=6371,la=Math.toRadians(a),lb=Math.toRadians(c),dlat=Math.toRadians(c-a),dlon=Math.toRadians(d-b);double x=Math.sin(dlat/2)*Math.sin(dlat/2)+Math.cos(la)*Math.cos(lb)*Math.sin(dlon/2)*Math.sin(dlon/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}}

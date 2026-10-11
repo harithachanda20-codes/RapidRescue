@@ -1,0 +1,1 @@
+package com.rapidrescue.exception; public class BookingException extends RuntimeException{public BookingException(String m){super(m);}}

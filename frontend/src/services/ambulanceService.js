@@ -1,0 +1,1 @@
+import api from './api'; export const getAmbulances=()=>api.get('/ambulances'); export const getAvailableAmbulances=()=>api.get('/ambulances/available');

@@ -1,0 +1,1 @@
+import api from './api'; export const getPatientBookings=id=>api.get('/bookings/patient/'+id); export const getBooking=id=>api.get('/bookings/'+id);

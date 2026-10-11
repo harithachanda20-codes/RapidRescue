@@ -1,0 +1,1 @@
+-- Optional seed data is handled by DatabaseConfig so startup remains portable.

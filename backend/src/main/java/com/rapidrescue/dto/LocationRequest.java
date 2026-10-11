@@ -1,0 +1,1 @@
+package com.rapidrescue.dto; import jakarta.validation.constraints.*; public record LocationRequest(@NotNull Double latitude,@NotNull Double longitude) {}

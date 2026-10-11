@@ -1,0 +1,1 @@
+import api from './api'; export const getTracking=token=>api.get('/tracking/'+token);

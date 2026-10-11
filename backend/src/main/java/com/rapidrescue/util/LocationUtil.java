@@ -1,0 +1,1 @@
+package com.rapidrescue.util; public final class LocationUtil {private LocationUtil(){} public static boolean valid(Double lat,Double lng){return lat!=null&&lng!=null&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;}}

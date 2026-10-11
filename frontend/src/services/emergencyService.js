@@ -1,0 +1,1 @@
+import api from './api'; export const createEmergency=data=>api.post('/emergency',data); export const getEmergency=id=>api.get('/emergency/'+id); export const updateEmergencyStatus=(id,status)=>api.put(`/emergency/${id}/status?value=${status}`);

@@ -1,0 +1,1 @@
+import api from './api'; export const getHospitals=()=>api.get('/hospitals'); export const getNearbyHospitals=(lat,lng)=>api.get(`/hospitals/nearby?lat=${lat}&lng=${lng}`);
