@@ -10,6 +10,8 @@ const initialRegistration = {
   password: '',
   confirmPassword: '',
   role: 'DRIVER',
+  licenseNumber: '',
+  licenseType: 'ALS',
 };
 
 export default function Login() {
@@ -65,7 +67,6 @@ export default function Login() {
     setSuccess('');
   }
 
-  // Login for Admin, Driver and Hospital Manager.
   async function handlePasswordLogin(event) {
     event.preventDefault();
 
@@ -86,7 +87,6 @@ export default function Login() {
     }
   }
 
-  // Request patient OTP.
   async function handleRequestOtp(event) {
     event.preventDefault();
 
@@ -109,7 +109,7 @@ export default function Login() {
       setOtp('');
 
       setSuccess(
-        'OTP requested. Check the backend console for local testing.'
+        'OTP requested. SMS delivery is not configured; check the backend console for local testing.'
       );
     } catch (error) {
       setErr(
@@ -121,7 +121,6 @@ export default function Login() {
     }
   }
 
-  // Verify patient OTP.
   async function handleVerifyOtp(event) {
     event.preventDefault();
 
@@ -153,7 +152,6 @@ export default function Login() {
     }
   }
 
-  // Registration for Driver or Hospital Manager.
   async function handleRegistration(event) {
     event.preventDefault();
 
@@ -185,24 +183,40 @@ export default function Login() {
       return;
     }
 
-    // Never allow public Admin registration.
-    if (!['DRIVER', 'HOSPITAL_MANAGER'].includes(registration.role)) {
+    if (
+      !['DRIVER', 'HOSPITAL_MANAGER'].includes(registration.role)
+    ) {
       setErr(
         'Admin accounts must be created through an authorized process.'
       );
       return;
     }
 
+    if (
+      registration.role === 'DRIVER' &&
+      !registration.licenseNumber.trim()
+    ) {
+      setErr('Enter your driver license number.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await api.post('/auth/register', {
+      const payload = {
         fullName: registration.fullName.trim(),
         email: registration.email.trim(),
         phone: registration.phone,
         password: registration.password,
         role: registration.role,
-      });
+      };
+
+      if (registration.role === 'DRIVER') {
+        payload.licenseNumber = registration.licenseNumber.trim();
+        payload.licenseType = registration.licenseType;
+      }
+
+      await api.post('/auth/register', payload);
 
       setCredentials({
         email: registration.email.trim(),
@@ -214,13 +228,13 @@ export default function Login() {
 
       setSuccess(
         registration.role === 'HOSPITAL_MANAGER'
-          ? 'Registration submitted. Hospital Manager access may require approval and hospital assignment.'
+          ? 'Registration successful. Hospital Manager access may require approval and hospital assignment.'
           : 'Registration successful. You can now log in.'
       );
     } catch (error) {
       setErr(
         error.response?.data?.message ||
-          'Registration failed. Check your backend registration endpoint.'
+          'Registration failed. Please check the backend logs.'
       );
     } finally {
       setLoading(false);
@@ -250,7 +264,6 @@ export default function Login() {
               : 'Sign in to the RapidRescue response network.'}
         </p>
 
-        {/* Patient and staff selection */}
         <div
           style={{
             display: 'flex',
@@ -275,7 +288,6 @@ export default function Login() {
           </button>
         </div>
 
-        {/* Patient OTP login */}
         {mode === 'patient' && (
           <form
             onSubmit={
@@ -390,14 +402,12 @@ export default function Login() {
             )}
 
             <p className="hint">
-              {otpRequested
-                ? 'For local testing, find the 4-digit OTP in the IntelliJ console. SMS delivery is not configured.'
-                : 'Enter your registered mobile number to request an OTP.'}
+              SMS delivery is not configured. For local testing, check
+              the IntelliJ console for the OTP.
             </p>
           </form>
         )}
 
-        {/* Staff login */}
         {mode === 'staff' && staffPage === 'login' && (
           <form onSubmit={handlePasswordLogin}>
             <label htmlFor="email">Email</label>
@@ -463,12 +473,11 @@ export default function Login() {
             </button>
 
             <p className="hint">
-              Admin demo: admin@rapidrescue.com / Admin@123
+              Admin accounts must be created through an authorized process.
             </p>
           </form>
         )}
 
-        {/* Staff registration */}
         {mode === 'staff' && staffPage === 'register' && (
           <form onSubmit={handleRegistration}>
             <label htmlFor="fullName">Full name</label>
@@ -477,7 +486,6 @@ export default function Login() {
               id="fullName"
               type="text"
               placeholder="Enter your full name"
-              autoComplete="name"
               value={registration.fullName}
               onChange={(event) =>
                 setRegistration({
@@ -495,7 +503,6 @@ export default function Login() {
               id="registerEmail"
               type="email"
               placeholder="Enter your email"
-              autoComplete="email"
               value={registration.email}
               onChange={(event) =>
                 setRegistration({
@@ -543,20 +550,53 @@ export default function Login() {
               }}
               required
               disabled={loading}
-              style={inputStyle}
             >
               <option value="DRIVER">Driver</option>
               <option value="HOSPITAL_MANAGER">
                 Hospital Manager
               </option>
-              <option value="ADMIN">Admin</option>
+              <option value="ADMIN" disabled>
+                Admin (authorization required)
+              </option>
             </select>
 
-            {registration.role === 'ADMIN' && (
-              <p className="hint" style={{ color: '#b91c1c' }}>
-                Admin accounts require authorization. Public registration
-                cannot create an administrator account.
-              </p>
+            {registration.role === 'DRIVER' && (
+              <>
+                <label htmlFor="licenseNumber">License number</label>
+
+                <input
+                  id="licenseNumber"
+                  type="text"
+                  placeholder="Enter your driver license number"
+                  value={registration.licenseNumber}
+                  onChange={(event) =>
+                    setRegistration({
+                      ...registration,
+                      licenseNumber: event.target.value,
+                    })
+                  }
+                  required
+                  disabled={loading}
+                />
+
+                <label htmlFor="licenseType">License type</label>
+
+                <select
+                  id="licenseType"
+                  value={registration.licenseType}
+                  onChange={(event) =>
+                    setRegistration({
+                      ...registration,
+                      licenseType: event.target.value,
+                    })
+                  }
+                  required
+                  disabled={loading}
+                >
+                  <option value="ALS">ALS</option>
+                  <option value="BLS">BLS</option>
+                </select>
+              </>
             )}
 
             <label htmlFor="registerPassword">Password</label>
@@ -565,7 +605,6 @@ export default function Login() {
               id="registerPassword"
               type="password"
               placeholder="At least 8 characters"
-              autoComplete="new-password"
               value={registration.password}
               onChange={(event) =>
                 setRegistration({
@@ -584,7 +623,6 @@ export default function Login() {
               id="confirmPassword"
               type="password"
               placeholder="Re-enter password"
-              autoComplete="new-password"
               value={registration.confirmPassword}
               onChange={(event) =>
                 setRegistration({
@@ -614,9 +652,8 @@ export default function Login() {
             </button>
 
             <p className="hint">
-              Driver and Hospital Manager registration depends on backend
-              support. Hospital Managers should be assigned a hospital by
-              an administrator. Admin registration requires authorization.
+              Hospital Manager registration may require administrator
+              approval and hospital assignment.
             </p>
 
             <button
@@ -634,16 +671,3 @@ export default function Login() {
     </div>
   );
 }
-
-const inputStyle = {
-  display: 'block',
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: 12,
-  marginTop: 6,
-  marginBottom: 12,
-  border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  fontSize: 14,
-  fontFamily: 'inherit',
-};
