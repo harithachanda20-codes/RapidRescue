@@ -1,6 +1,7 @@
 package com.rapidrescue.config;
 
 import com.rapidrescue.security.JwtAuthenticationFilter;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -20,63 +22,77 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
- @Bean
- PasswordEncoder passwordEncoder() {
-  return new BCryptPasswordEncoder();
- }
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
- @Bean
- CorsConfigurationSource corsConfigurationSource() {
-  CorsConfiguration configuration = new CorsConfiguration();
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
 
-  configuration.setAllowedOrigins(List.of(
-          "http://localhost:5173",
-          "http://localhost:5174"
-  ));
+        CorsConfiguration configuration = new CorsConfiguration();
 
-  configuration.setAllowedMethods(List.of(
-          "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-  ));
+        // Allow local development and the deployed RapidRescue frontend.
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://rapid-rescue-rho.vercel.app"
+        ));
 
-  configuration.setAllowedHeaders(List.of("*"));
-  configuration.setAllowCredentials(true);
+        configuration.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
 
-  UrlBasedCorsConfigurationSource source =
-          new UrlBasedCorsConfigurationSource();
+        configuration.setAllowedHeaders(List.of("*"));
 
-  source.registerCorsConfiguration("/**", configuration);
+        configuration.setAllowCredentials(true);
 
-  return source;
- }
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
 
- @Bean
- SecurityFilterChain filterChain(
-         HttpSecurity http,
-         JwtAuthenticationFilter jwt
- ) throws Exception {
+        source.registerCorsConfiguration("/**", configuration);
 
-  http
-          .csrf(csrf -> csrf.disable())
-          .cors(cors -> {})
-          .sessionManagement(session ->
-                  session.sessionCreationPolicy(
-                          SessionCreationPolicy.STATELESS
-                  )
-          )
-          .authorizeHttpRequests(auth -> auth
-                  .requestMatchers(
-                          "/api/auth/**",
-                          "/api/health",
-                          "/ws/**",
-                          "/api/tracking/**"
-                  ).permitAll()
-                  .anyRequest().authenticated()
-          )
-          .addFilterBefore(
-                  jwt,
-                  UsernamePasswordAuthenticationFilter.class
-          );
+        return source;
+    }
 
-  return http.build();
- }
+    @Bean
+    SecurityFilterChain filterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwt
+    ) throws Exception {
+
+        http
+                .csrf(csrf -> csrf.disable())
+
+                // Enable CORS using the configuration above.
+                .cors(cors -> {})
+
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/health",
+                                "/ws/**",
+                                "/api/tracking/**"
+                        ).permitAll()
+                        .anyRequest().authenticated()
+                )
+
+                .addFilterBefore(
+                        jwt,
+                        UsernamePasswordAuthenticationFilter.class
+                );
+
+        return http.build();
+    }
 }
