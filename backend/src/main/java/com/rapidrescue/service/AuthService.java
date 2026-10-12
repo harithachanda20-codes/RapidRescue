@@ -5,6 +5,7 @@ import com.rapidrescue.entity.*;
 import com.rapidrescue.repository.*;
 import com.rapidrescue.security.JwtService;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,235 +15,308 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
- private final UserRepository users;
- private final PatientRepository patients;
- private final DriverRepository drivers;
- private final PasswordEncoder encoder;
- private final JwtService jwt;
+    private final UserRepository users;
+    private final PatientRepository patients;
+    private final DriverRepository drivers;
+    private final PasswordEncoder encoder;
+    private final JwtService jwt;
 
- public AuthService(
-         UserRepository users,
-         PatientRepository patients,
-         DriverRepository drivers,
-         PasswordEncoder encoder,
-         JwtService jwt) {
+    // Admin registration secret from environment configuration
+    @Value("${app.admin-registration-code:}")
+    private String adminRegistrationCode;
 
-  this.users = users;
-  this.patients = patients;
-  this.drivers = drivers;
-  this.encoder = encoder;
-  this.jwt = jwt;
- }
+    public AuthService(
+            UserRepository users,
+            PatientRepository patients,
+            DriverRepository drivers,
+            PasswordEncoder encoder,
+            JwtService jwt) {
 
- // Register a Driver or Hospital Manager.
- // Admin accounts cannot be created through public registration.
- @Transactional
- public AuthResponse register(RegisterRequest request) {
+        this.users = users;
+        this.patients = patients;
+        this.drivers = drivers;
+        this.encoder = encoder;
+        this.jwt = jwt;
+    }
 
-  if (users.existsByEmail(request.email())) {
-   throw new IllegalArgumentException(
-           "Email already registered"
-   );
-  }
+    // Register Patient, Driver, Hospital Manager, or authorized Admin.
+    @Transactional
+    public AuthResponse register(RegisterRequest request) {
 
-  if (users.existsByPhone(request.phone())) {
-   throw new IllegalArgumentException(
-           "Phone already registered"
-   );
-  }
+        if (request.email() == null || request.email().isBlank()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
 
-  Role role = request.role();
+        if (request.phone() == null || request.phone().isBlank()) {
+            throw new IllegalArgumentException("Phone number is required.");
+        }
 
-  if (role == null) {
-   throw new IllegalArgumentException(
-           "Please select a registration role."
-   );
-  }
+        if (users.existsByEmail(request.email().trim())) {
+            throw new IllegalArgumentException(
+                    "Email already registered."
+            );
+        }
 
-  if (role == Role.ADMIN) {
-   throw new IllegalArgumentException(
-           "Admin accounts must be created by an authorized administrator."
-   );
-  }
+        if (users.existsByPhone(request.phone().trim())) {
+            throw new IllegalArgumentException(
+                    "Phone already registered."
+            );
+        }
 
-  if (role != Role.PATIENT &&
-          role != Role.DRIVER &&
-          role != Role.HOSPITAL_MANAGER) {
-   throw new IllegalArgumentException(
-           "Invalid registration role."
-   );
-  }
+        Role role = request.role();
 
-  if (request.password() == null ||
-          request.password().length() < 6) {
-   throw new IllegalArgumentException(
-           "Password must contain at least 6 characters."
-   );
-  }
+        if (role == null) {
+            throw new IllegalArgumentException(
+                    "Please select a registration role."
+            );
+        }
 
-  User user = new User();
+        if (role != Role.PATIENT
+                && role != Role.DRIVER
+                && role != Role.HOSPITAL_MANAGER
+                && role != Role.ADMIN) {
 
-  user.setFullName(request.fullName().trim());
-  user.setEmail(request.email().trim());
-  user.setPhone(request.phone().trim());
-  user.setPassword(encoder.encode(request.password()));
-  user.setRole(role);
+            throw new IllegalArgumentException(
+                    "Invalid registration role."
+            );
+        }
 
-  users.save(user);
+        if (request.fullName() == null
+                || request.fullName().isBlank()) {
 
-  Long profileId = user.getId();
+            throw new IllegalArgumentException(
+                    "Full name is required."
+            );
+        }
 
-  if (role == Role.PATIENT) {
-   Patient patient = new Patient();
-   patient.setUser(user);
-   patient.setBloodGroup(request.bloodGroup());
-   patient.setAllergies(request.allergies());
-   patient.setEmergencyContact(request.emergencyContact());
-   patients.save(patient);
-   profileId = patient.getId();
-  }
+        if (request.password() == null
+                || request.password().length() < 6) {
 
-  if (role == Role.DRIVER) {
+            throw new IllegalArgumentException(
+                    "Password must contain at least 6 characters."
+            );
+        }
 
-   Driver driver = new Driver();
+        // Admin registration requires a secret configured on the server.
+        if (role == Role.ADMIN) {
 
-   driver.setUser(user);
-   driver.setLicenseNumber(request.licenseNumber());
-   driver.setLicenseType(request.licenseType());
+            if (adminRegistrationCode == null
+                    || adminRegistrationCode.isBlank()) {
 
-   drivers.save(driver);
+                throw new IllegalArgumentException(
+                        "Admin registration is not configured on the server."
+                );
+            }
 
-   profileId = drivers.findByUserId(user.getId())
-           .orElseThrow(() ->
-                   new IllegalStateException(
-                           "Driver profile could not be created."
-                   )
-           )
-           .getId();
-  }
+            if (request.adminRegistrationCode() == null
+                    || !adminRegistrationCode.equals(
+                            request.adminRegistrationCode())) {
 
-  /*
-   * Hospital Manager registration creates a User account.
-   * Hospital assignment and manager-specific permissions
-   * must be implemented separately.
-   */
+                throw new IllegalArgumentException(
+                        "Invalid Admin registration code."
+                );
+            }
 
-  return new AuthResponse(
-          jwt.generate(
-                  user.getEmail(),
-                  user.getRole().name()
-          ),
-          profileId,
-          user.getFullName(),
-          user.getRole().name()
-  );
- }
+            // Permit public Admin registration only while no Admin exists.
+            if (users.existsByRole(Role.ADMIN)) {
+                throw new IllegalArgumentException(
+                        "An Admin account already exists. Contact the existing administrator."
+                );
+            }
+        }
 
- // Existing email/password login.
- public AuthResponse login(LoginRequest request) {
+        // Driver registration requires a licence number.
+        if (role == Role.DRIVER) {
 
-  User user = users.findByEmail(request.email());
+            if (request.licenseNumber() == null
+                    || request.licenseNumber().isBlank()) {
 
-  if (user == null ||
-          !encoder.matches(
-                  request.password(),
-                  user.getPassword()
-          )) {
+                throw new IllegalArgumentException(
+                        "Driver licence number is required."
+                );
+            }
 
-   throw new IllegalArgumentException(
-           "Invalid email or password"
-   );
-  }
+            if (request.licenseType() == null
+                    || request.licenseType().isBlank()) {
 
-  Long profileId = user.getId();
+                throw new IllegalArgumentException(
+                        "Driver licence type is required."
+                );
+            }
+        }
 
-  if (user.getRole() == Role.PATIENT) {
+        User user = new User();
 
-   profileId = patients.findByUserId(user.getId())
-           .orElseThrow(() ->
-                   new IllegalArgumentException(
-                           "Patient profile not found."
-                   )
-           )
-           .getId();
-  }
+        user.setFullName(request.fullName().trim());
+        user.setEmail(request.email().trim());
+        user.setPhone(request.phone().trim());
+        user.setPassword(encoder.encode(request.password()));
+        user.setRole(role);
 
-  if (user.getRole() == Role.DRIVER) {
+        users.save(user);
 
-   profileId = drivers.findByUserId(user.getId())
-           .orElseThrow(() ->
-                   new IllegalArgumentException(
-                           "Driver profile not found."
-                   )
-           )
-           .getId();
-  }
+        Long profileId = user.getId();
 
-  return new AuthResponse(
-          jwt.generate(
-                  user.getEmail(),
-                  user.getRole().name()
-          ),
-          profileId,
-          user.getFullName(),
-          user.getRole().name()
-  );
- }
+        // Create Patient profile.
+        if (role == Role.PATIENT) {
 
- // Patient login or account creation after OTP verification.
- @Transactional
- public AuthResponse loginWithPhone(String phone) {
+            Patient patient = new Patient();
 
-  User user = users.findByPhone(phone);
+            patient.setUser(user);
+            patient.setBloodGroup(request.bloodGroup());
+            patient.setAllergies(request.allergies());
+            patient.setEmergencyContact(request.emergencyContact());
 
-  if (user == null) {
+            patients.save(patient);
 
-   user = new User();
+            profileId = patient.getId();
+        }
 
-   user.setFullName("Patient");
-   user.setPhone(phone);
-   user.setEmail(phone + "@rapidrescue.local");
+        // Create Driver profile.
+        if (role == Role.DRIVER) {
 
-   user.setPassword(
-           encoder.encode(
-                   UUID.randomUUID().toString()
-           )
-   );
+            Driver driver = new Driver();
 
-   user.setRole(Role.PATIENT);
+            driver.setUser(user);
+            driver.setLicenseNumber(
+                    request.licenseNumber().trim()
+            );
+            driver.setLicenseType(
+                    request.licenseType().trim()
+            );
 
-   user = users.save(user);
+            drivers.save(driver);
 
-   Patient patient = new Patient();
-   patient.setUser(user);
+            profileId = drivers.findByUserId(user.getId())
+                    .orElseThrow(() ->
+                            new IllegalStateException(
+                                    "Driver profile could not be created."
+                            )
+                    )
+                    .getId();
+        }
 
-   patients.save(patient);
-  }
+        /*
+         * Hospital Manager and Admin accounts are created as User accounts.
+         * Hospital assignment and role-specific permissions must be
+         * implemented separately if your application requires them.
+         */
 
-  if (user.getRole() != Role.PATIENT) {
-   throw new IllegalArgumentException(
-           "Mobile OTP login is available only for patients."
-   );
-  }
+        return new AuthResponse(
+                jwt.generate(
+                        user.getEmail(),
+                        user.getRole().name()
+                ),
+                profileId,
+                user.getFullName(),
+                user.getRole().name()
+        );
+    }
 
-  Long profileId = patients.findByUserId(user.getId())
-          .orElseThrow(() ->
-                  new IllegalArgumentException(
-                          "Patient profile not found."
-                  )
-          )
-          .getId();
+    // Email/password login for registered users.
+    public AuthResponse login(LoginRequest request) {
 
-  String token = jwt.generate(
-          user.getEmail(),
-          user.getRole().name()
-  );
+        User user = users.findByEmail(request.email());
 
-  return new AuthResponse(
-          token,
-          profileId,
-          user.getFullName(),
-          user.getRole().name()
-  );
- }
+        if (user == null
+                || !encoder.matches(
+                        request.password(),
+                        user.getPassword())) {
+
+            throw new IllegalArgumentException(
+                    "Invalid email or password."
+            );
+        }
+
+        Long profileId = user.getId();
+
+        if (user.getRole() == Role.PATIENT) {
+
+            profileId = patients.findByUserId(user.getId())
+                    .orElseThrow(() ->
+                            new IllegalArgumentException(
+                                    "Patient profile not found."
+                            )
+                    )
+                    .getId();
+        }
+
+        if (user.getRole() == Role.DRIVER) {
+
+            profileId = drivers.findByUserId(user.getId())
+                    .orElseThrow(() ->
+                            new IllegalArgumentException(
+                                    "Driver profile not found."
+                            )
+                    )
+                    .getId();
+        }
+
+        return new AuthResponse(
+                jwt.generate(
+                        user.getEmail(),
+                        user.getRole().name()
+                ),
+                profileId,
+                user.getFullName(),
+                user.getRole().name()
+        );
+    }
+
+    // Existing patient OTP login; retained to avoid breaking the old flow.
+    @Transactional
+    public AuthResponse loginWithPhone(String phone) {
+
+        User user = users.findByPhone(phone);
+
+        if (user == null) {
+
+            user = new User();
+
+            user.setFullName("Patient");
+            user.setPhone(phone);
+            user.setEmail(phone + "@rapidrescue.local");
+
+            user.setPassword(
+                    encoder.encode(
+                            UUID.randomUUID().toString()
+                    )
+            );
+
+            user.setRole(Role.PATIENT);
+
+            user = users.save(user);
+
+            Patient patient = new Patient();
+            patient.setUser(user);
+
+            patients.save(patient);
+        }
+
+        if (user.getRole() != Role.PATIENT) {
+            throw new IllegalArgumentException(
+                    "Mobile OTP login is available only to patients."
+            );
+        }
+
+        Long profileId = patients.findByUserId(user.getId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Patient profile not found."
+                        )
+                )
+                .getId();
+
+        String token = jwt.generate(
+                user.getEmail(),
+                user.getRole().name()
+        );
+
+        return new AuthResponse(
+                token,
+                profileId,
+                user.getFullName(),
+                user.getRole().name()
+        );
+    }
 }

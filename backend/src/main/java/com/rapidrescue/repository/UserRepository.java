@@ -1,6 +1,8 @@
 package com.rapidrescue.repository;
 
+import com.rapidrescue.entity.Role;
 import com.rapidrescue.entity.User;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);
+
+    boolean existsByRole(Role role);
 }
